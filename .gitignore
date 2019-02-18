@@ -1,5 +1,8 @@
 ANILLO/anillo
 
+*/machinefile
+.vscode
+
 # Prerequisites
 *.d
 
