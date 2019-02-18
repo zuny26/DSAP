@@ -1,5 +1,6 @@
 CC=mpicc
 RUN=mpirun
+FLAGS=-lm
 SOURCE=$(wildcard *.c) 
 OBJ=$(basename $(SOURCE))
 NP=4
@@ -9,7 +10,7 @@ MFILE = -machinefile $(MACHINEFILE)
 
 
 $(OBJ): $(SOURCE)
-	$(CC) -o $(OBJ) $(SOURCE)
+	$(CC) -o $(OBJ) $(SOURCE) $(FLAGS)
 
 run: 
 	$(RUN) $(PARAMS) $(OBJ)
