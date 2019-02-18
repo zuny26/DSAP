@@ -37,14 +37,12 @@ int main(int argc, char **argv)
 				MPI_Send(&array, size, MPI_DOUBLE, 1, 0, MPI_COMM_WORLD);
 				MPI_Recv(&array, size, MPI_DOUBLE, MPI_ANY_SOURCE, 1, MPI_COMM_WORLD, &estado);
 				end_time = MPI_Wtime() * 1000000;
-				times += (end_time - start_time) / 2;
-				tcom[i] += times;
+				tcom[i] += (end_time - start_time) / 2;
 			}
 			tcom[i] = tcom[i]/n;
 			tau[i] = (tcom[i] - beta) / (8*size);
-			printf("T%d\t\tTcom=%.2f\tms\t\tTau=%.4f\tms/bytes\n", i, tcom[i], tau[i]);
+			printf("T%d\tTcom=%.4f\tms\tTau=%.4f\tms/bytes\n", i, tcom[i], tau[i]);
 		}
-
     }
 	else if (myrank==1){
 		for (int i=0;i<n;++i){
