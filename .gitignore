@@ -1,4 +1,7 @@
-ANILLO/anillo
+# files without extension (executable)
+*
+!/**/
+!*.*
 
 */machinefile
 .vscode
