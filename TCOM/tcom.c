@@ -3,7 +3,7 @@
 
 int main(int argc, char **argv)
 {
-	int n = 1000; // número de iteraciones  
+	int n = 1000; 
 	int myrank=0, numproc = 0;
     char c = 'a';
 	double beta, start_time, end_time, times;
