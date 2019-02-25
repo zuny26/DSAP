@@ -41,7 +41,8 @@ int main(int argc, char **argv)
 			}
 			tcom[i] = tcom[i]/n;
 			tau[i] = (tcom[i] - beta) / (8*size);
-			printf("T%d\tTcom=%.4f\tms\tTau=%.4f\tms/bytes\n", i, tcom[i], tau[i]);
+			// printf("T%d\tTcom=%.2f\tms\tTau=%.6f\tms/byte\n", size, tcom[i], tau[i]);
+			printf("%d, %.4f, %.6f\n", size*8, tcom[i], tau[i]);
 		}
     }
 	else if (myrank==1){
