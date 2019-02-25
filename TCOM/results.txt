@@ -1,17 +1,16 @@
-mpirun -machinefile machinefile -np 2 -npernode 1 tcom
-La latencia es de 37.7435 ms
-T5		Tcom=392.10	ms		Tau=1.3842	ms/bytes
-T6		Tcom=427.20	ms		Tau=0.7607	ms/bytes
-T7		Tcom=524.44	ms		Tau=0.4753	ms/bytes
-T8		Tcom=593.12	ms		Tau=0.2712	ms/bytes
-T9		Tcom=601.07	ms		Tau=0.1375	ms/bytes
-T10		Tcom=951.60	ms		Tau=0.1116	ms/bytes
-T11		Tcom=1690.16	ms		Tau=0.1009	ms/bytes
-T12		Tcom=3160.40	ms		Tau=0.0953	ms/bytes
-T13		Tcom=6211.78	ms		Tau=0.0942	ms/bytes
-T14		Tcom=12123.36	ms		Tau=0.0922	ms/bytes
-T15		Tcom=23110.64	ms		Tau=0.0880	ms/bytes
-T16		Tcom=45263.90	ms		Tau=0.0863	ms/bytes
-T17		Tcom=89922.61	ms		Tau=0.0857	ms/bytes
-T18		Tcom=178894.49	ms		Tau=0.0853	ms/bytes
-T19		Tcom=357170.81	ms		Tau=0.0851	ms/bytes
+La latencia es de 35.4830 ms
+256, 361.0375, 1.271697
+512, 426.3435, 0.763399
+1024, 510.8210, 0.464197
+2048, 592.3455, 0.271906
+4096, 605.1925, 0.139089
+8192, 950.6545, 0.111715
+16384, 1701.6825, 0.101697
+32768, 3161.5220, 0.095399
+65536, 6289.7405, 0.095432
+131072, 11992.3180, 0.091223
+262144, 23114.5930, 0.088040
+524288, 45259.6540, 0.086258
+1048576, 89997.8045, 0.085795
+2097152, 178894.9955, 0.085287
+4194304, 357179.1830, 0.085150
