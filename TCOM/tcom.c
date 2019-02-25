@@ -27,6 +27,7 @@ int main(int argc, char **argv)
 		}
 		beta = times/n;
 		printf("La latencia es de %.4f ms\n", beta);
+		printf("Bytes\t\tTiempo(ms)\t\tTau(ms/byte)\n");
 		for (int i=min_size;i<max_size;++i){
 			size = pow(2, i);
 			double array[size];
@@ -42,7 +43,7 @@ int main(int argc, char **argv)
 			tcom[i] = tcom[i]/n;
 			tau[i] = (tcom[i] - beta) / (8*size);
 			// printf("T%d\tTcom=%.2f\tms\tTau=%.6f\tms/byte\n", size, tcom[i], tau[i]);
-			printf("%d, %.4f, %.6f\n", size*8, tcom[i], tau[i]);
+			printf("%d,\t\t%.4f,\t\t%.6f\n", size*8, tcom[i], tau[i]);
 		}
     }
 	else if (myrank==1){
