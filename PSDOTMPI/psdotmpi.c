@@ -70,5 +70,7 @@ int main(int argc, char** argv){
         // printf("\nSoy el proceso 0 y el resultado final es %.2f\n\n", final);
         printf("\nEl producto escalar del vector es %.1f\n\n", final);
     }
+    free(x);
+    free(y);
     MPI_Finalize();
 }
