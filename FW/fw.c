@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <mpi.h>
 #include <stdlib.h>
+#include <string.h>
 
 #define maxnumprocs 8
 #define maxn 1000
@@ -42,23 +43,60 @@ int main(int argc, char** argv){
 			return 0;
 		}
 		else printf("Número de vértices en el grafo: %d\n\n",n); 	
-		resto = n % numproc;
-		dist = crearMatrizPesos(n, n);
-		caminos = crearMatrizCaminos(n, n);
-		definirGrafo(n, dist, caminos);
-		if (n<10) {
-			printMatrizPesos(dist, n, n);
-			// printMatrizCaminos(caminos, n, n);
-		}
 	} 
 	MPI_Bcast(&n, 1, MPI_INT, 0, MPI_COMM_WORLD);
 	lm = n / numproc; 
+	dist = crearMatrizPesos(n, n);
+	caminos = crearMatrizCaminos(n, n);
+	if (myrank == 0){
+		definirGrafo(n, dist, caminos);
+		if (n<10){
+			printMatrizPesos(dist, n,n);
+			printMatrizCaminos(caminos, n, n);
+		}
+		resto = n % numproc;
+	}
+	MPI_Barrier(MPI_COMM_WORLD);
 	if(myrank != 0) {
-		dist = crearMatrizPesos(n, n);
-		caminos = crearMatrizCaminos(n, n);
-		MPI_Scatter(&dist[resto+myrank+n%numproc][0], lm*n, MPI_FLOAT, &dist[resto+myrank+n%numproc][0], lm*n, MPI_FLOAT, 0, MPI_COMM_WORLD);
+		MPI_Scatter(&dist[0][0], lm*n, MPI_FLOAT, &dist[0][0], lm*n, MPI_FLOAT, 0, MPI_COMM_WORLD);
+		MPI_Scatter(&caminos[0][0], lm*n, MPI_INT, &caminos[0][0], lm*n, MPI_INT, 0, MPI_COMM_WORLD);
 	} else{
 		MPI_Scatter(&dist[resto][0], lm*n, MPI_FLOAT, MPI_IN_PLACE, lm*n, MPI_FLOAT, 0,MPI_COMM_WORLD);
+		MPI_Scatter(&caminos[resto][0], lm*n, MPI_INT, MPI_IN_PLACE, lm*n, MPI_INT, 0,MPI_COMM_WORLD);
+	}
+	int sender = 0, fila_k = 0;
+	float* auxd = (float*)malloc(n*sizeof(float));
+	int* auxc = (int*)malloc(n*sizeof(int));
+	for (int k=0;k<n;k++){
+		sender = (k<lm+resto) ? 0 : numproc-1-((n-k-1)/lm);
+		fila_k = (sender==0) ? k : k - (lm*sender) - n % numproc;
+		if (myrank==sender){
+			memcpy(auxd, dist[fila_k], (n+1)*sizeof(float));
+			memcpy(auxc, caminos[fila_k], (n+1)*sizeof(int));
+		}
+		MPI_Bcast(&auxd[0], n, MPI_FLOAT, sender, MPI_COMM_WORLD);
+		MPI_Bcast(&auxc[0], n, MPI_INT, sender, MPI_COMM_WORLD);
+		for (int i=0;i<lm+resto; i++){
+			for (int j=0;j<n;j++){
+				if (dist[i][k] * auxd[j] != 0){
+					if ( (dist[i][k]+auxd[j] < dist[i][j]) || (dist[i][j]==0)){
+						dist[i][j] = dist[i][k] + auxd[j];
+						caminos[i][j] = auxc[j];
+					}
+				}
+			}
+		}
+	}
+	if (myrank != 0){
+		MPI_Gather(&dist[0][0], lm*n, MPI_FLOAT, &dist[0][0], lm*n, MPI_FLOAT, 0, MPI_COMM_WORLD);
+		MPI_Gather(&caminos[resto][0], lm*n, MPI_INT, &caminos[resto][0], lm*n, MPI_INT, 0, MPI_COMM_WORLD);
+	} else {
+		MPI_Gather(MPI_IN_PLACE, lm*n, MPI_FLOAT, &dist[resto][0], lm*n, MPI_FLOAT, 0, MPI_COMM_WORLD);
+		MPI_Gather(MPI_IN_PLACE, lm*n, MPI_INT, &caminos[resto][0], lm*n, MPI_INT, 0, MPI_COMM_WORLD);
+	}
+	if (myrank == 0 && n<10){
+		printMatrizPesos(dist, n,n);
+		printMatrizCaminos(caminos, n, n);
 	}
 	destruirMatrizPesos(dist, n);
 	destruirMatrizCaminos(caminos, n);
