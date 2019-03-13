@@ -6,7 +6,6 @@
 #define maxnumprocs 8
 #define maxn 1000
 
-
 int main(int argc, char** argv){
 	float** crearMatrizPesos(int, int);
 	int** crearMatrizCaminos(int, int);
@@ -15,6 +14,7 @@ int main(int argc, char** argv){
 	void printMatrizCaminos(int**, int, int);
 	void destruirMatrizPesos(float**, int);
 	void destruirMatrizCaminos(int**, int);
+	void calculaCamino(float**, int**, int);
 
 	int myrank = 0, numproc = 0, n = 0, lm = 0, resto = 0;
 	int *chunk_sizes, *despl;
@@ -24,27 +24,29 @@ int main(int argc, char** argv){
 	MPI_Init(NULL, NULL);
 	MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
 	MPI_Comm_size(MPI_COMM_WORLD, &numproc);
+	if (numproc > maxnumprocs){
+		if(myrank==0)printf("ERROR: superado el número máximo de procesos\n");
+		MPI_Finalize();
+		return 0;
+	}
 	if (myrank == 0){
-		if (numproc > maxnumprocs){
-			printf("ERROR: superado el número máximo de procesos\n");
-			MPI_Finalize();
-			return 0;
-		}
 		if (argc > 1) sscanf(argv[1], "%i", &n);
 		else{
-			// TODO: argumento o input por teclado?? 
-			printf("Usage: se debe proporcionar el número de vértices como el primer argumento\n");
-			MPI_Finalize();
-			return 0;
+			printf("Introduce el número de vertices:\n");
+			scanf("%i", &n);
 		}
-		if (n>maxn){
-			printf("ERROR: supero el número máximo de vértices\n");
-			MPI_Finalize();
-			return 0;
-		}
-		else printf("Número de vértices en el grafo: %d\n\n",n); 	
 	} 
 	MPI_Bcast(&n, 1, MPI_INT, 0, MPI_COMM_WORLD);
+	if (n>maxn){
+		if (myrank == 0)printf("ERROR: supero el número máximo de vértices\n");
+		MPI_Finalize();
+		exit(0);
+	} else if(n<=0){
+		if (myrank == 0)printf("ERROR: incorrecto número de vértices\n");
+		MPI_Finalize();
+		exit(0);
+	}
+	else if (myrank==0) printf("Número de vértices en el grafo: %d\n\n",n); 	
 	lm = n / numproc; 
 	dist = crearMatrizPesos(n, n);
 	caminos = crearMatrizCaminos(n, n);
@@ -68,12 +70,13 @@ int main(int argc, char** argv){
 	float* auxd = (float*)malloc(n*sizeof(float));
 	int* auxc = (int*)malloc(n*sizeof(int));
 	for (int k=0;k<n;k++){
-		sender = (k<lm+resto) ? 0 : numproc-1-((n-k-1)/lm);
+		sender = (k<lm+n%numproc) ? 0 : numproc-1-((n-k-1)/lm);
 		fila_k = (sender==0) ? k : k - (lm*sender) - n % numproc;
 		if (myrank==sender){
-			memcpy(auxd, dist[fila_k], (n+1)*sizeof(float));
-			memcpy(auxc, caminos[fila_k], (n+1)*sizeof(int));
+			memcpy(&auxd[0], &dist[fila_k][0], n*sizeof(float));
+			memcpy(&auxc[0], &caminos[fila_k][0], n*sizeof(int));
 		}
+		MPI_Barrier(MPI_COMM_WORLD);
 		MPI_Bcast(&auxd[0], n, MPI_FLOAT, sender, MPI_COMM_WORLD);
 		MPI_Bcast(&auxc[0], n, MPI_INT, sender, MPI_COMM_WORLD);
 		for (int i=0;i<lm+resto; i++){
@@ -87,6 +90,10 @@ int main(int argc, char** argv){
 			}
 		}
 	}
+	auxc = NULL;
+	auxd = NULL;
+	free(auxc);
+	free(auxd);
 	if (myrank != 0){
 		MPI_Gather(&dist[0][0], lm*n, MPI_FLOAT, &dist[0][0], lm*n, MPI_FLOAT, 0, MPI_COMM_WORLD);
 		MPI_Gather(&caminos[resto][0], lm*n, MPI_INT, &caminos[resto][0], lm*n, MPI_INT, 0, MPI_COMM_WORLD);
@@ -94,9 +101,12 @@ int main(int argc, char** argv){
 		MPI_Gather(MPI_IN_PLACE, lm*n, MPI_FLOAT, &dist[resto][0], lm*n, MPI_FLOAT, 0, MPI_COMM_WORLD);
 		MPI_Gather(MPI_IN_PLACE, lm*n, MPI_INT, &caminos[resto][0], lm*n, MPI_INT, 0, MPI_COMM_WORLD);
 	}
-	if (myrank == 0 && n<10){
-		printMatrizPesos(dist, n,n);
-		printMatrizCaminos(caminos, n, n);
+	if (myrank == 0){
+		if (n<10){
+			printMatrizPesos(dist, n,n);
+			printMatrizCaminos(caminos, n, n);
+		}
+		calculaCamino(dist, caminos, n);
 	}
 	destruirMatrizPesos(dist, n);
 	destruirMatrizCaminos(caminos, n);
@@ -206,4 +216,44 @@ void destruirMatrizPesos(float** dist, int n){
 	}
 	free(dist[0]);
 	free(dist);
+}
+
+void calculaCamino(float **a, int **b, int n)
+{
+	int i,count=2, count2;
+	int anterior; 
+	int *camino;
+	int inicio=-1, fin=-1;
+	while ((inicio < 0) || (inicio >n) || (fin < 0) || (fin > n)) {
+		printf("Vertices inicio y final: (0 0 para salir)\n");
+		scanf("%d %d",&inicio, &fin);
+	}
+	while ((inicio != 0) && (fin != 0)) {
+		anterior = fin;
+		while (b[inicio-1][anterior-1] != inicio) {
+			anterior = b[inicio-1][anterior-1];
+			count = count + 1;
+		}
+		count2 = count;
+		camino = malloc(count * sizeof(int));
+		anterior = fin;
+		camino[count-1]=fin;
+		while (b[inicio-1][anterior-1] != inicio) {
+			anterior = b[inicio-1][anterior-1];
+			count = count - 1;
+			camino[count-1]=anterior;
+		}
+		camino[0] = inicio;
+		printf("\nCamino mas corto de %d a %d:\n", inicio, fin);
+		printf("\tPeso: %5.1f\n", a[inicio-1][fin-1]);
+		printf("\tCamino: ");
+		for (i=0; i<count2; i++) printf("%d ",camino[i]);
+		printf("\n");
+		free(camino);
+		inicio = -1;
+		while ((inicio < 0) || (inicio >n) || (fin < 0) || (fin > n)) {
+			printf("Vertices inicio y final: (0 0 para salir)\n");
+			scanf("%d %d",&inicio, &fin);
+		}
+	}
 }
