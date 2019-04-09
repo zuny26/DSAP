@@ -7,15 +7,15 @@
 #define START_TAG 1
 #define STOP_TAG 99
 
-typedef struct MinMax{
-	double min;
-	double max;
-} MinMax;
+typedef struct Min_Max{
+	double Min;
+	double Max;
+} Min_Max;
 
 int main(int argc, char** argv){
 	int** crearMatriz(int, int);
 	void destruirMatriz(int**, int);
-	MinMax buscarMinMax(int**, int, int);
+	Min_Max buscarMin_Max(int**, int, int);
 	double ctimer(void);
 
 	int pixelX, pixelY;
@@ -41,14 +41,16 @@ int main(int argc, char** argv){
 	int bn, bn2;
 	double Zx, Zy;             // Z=Zx+Zy*i  
 	double Zx2, Zy2;           // Zx2=Zx*Zx, Zy2=Zy*Zy  
-	int Iter,i,j;
+	int Iter;
 	int IterMax=1000;
 	const double Salida=2;    // valor de escape
 	double Salida2=Salida*Salida, SumaExponencial;
 	int dominio=0;
 	int **matriz, **matriz2;
-	MinMax  min_max_img;
+	Min_Max  min_max_img;
 
+	int *buffer; 
+	int sizeBuffer;
 
 	int myrank = 0, numproc = 0;
 	MPI_Status status;
@@ -57,6 +59,7 @@ int main(int argc, char** argv){
 	MPI_Init(NULL, NULL);
 	MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
 	MPI_Comm_size(MPI_COMM_WORLD, &numproc);
+
 	if (myrank == 0){
 
 
@@ -127,11 +130,19 @@ int main(int argc, char** argv){
 	MPI_Bcast(&pixelYmax, 1, MPI_INT, 0, MPI_COMM_WORLD);
 	MPI_Bcast(&IterMax, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
+	MPI_Pack_size(pixelXmax, MPI_INT, MPI_COMM_WORLD, &sizeBuffer);
+	sizeBuffer = numproc*(sizeBuffer + MPI_BSEND_OVERHEAD);
+	buffer = (int*) malloc(sizeBuffer);
+	if (buffer == NULL)
+		printf("Error al reservar la memoria del buffer\n");
+
 	AnchoPixel=(RealMax-RealMin)/(pixelXmax-1); 
 	AltoPixel=(ImMax-ImMin)/(pixelYmax-1);
 
 	// matriz de datos con la que van a trabajar los hijos:
-	int** datos = crearMatriz(2, pixelXmax);
+	// int** datos = crearMatriz(2, pixelXmax);
+	int* datos = (int*) malloc(pixelXmax*2*sizeof(int));
+
 	if(myrank==0){
 		int fila = 0;
 		for (int i=1;i<numproc; ++i){
@@ -140,36 +151,44 @@ int main(int argc, char** argv){
 			fila++;
 		}
 		while(fila < pixelYmax){
-			MPI_Recv(&datos[0][0], pixelXmax*2, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+			MPI_Recv(&datos[0], 2*pixelXmax, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
 			pixelY = status.MPI_TAG;
 			int source = status.MPI_SOURCE;
-			memcpy(&matriz[pixelY][0], &datos[0][0], pixelXmax*sizeof(int));
-			memcpy(&matriz2[pixelY][0], &datos[1][0], pixelXmax*sizeof(int));
+			memcpy(&matriz[pixelY][0], &datos[0], pixelXmax*sizeof(int));
+			memcpy(&matriz2[pixelY][0], &datos[pixelXmax], pixelXmax*sizeof(int));
 			// printf("ROOT: recibida la fila %d del proceso %d\n", filas[source], source);
-
+			
 			// printf("ROOT: enviando la fila %d al proceso %d\n", fila, source);
 			MPI_Send(&fila, 1, MPI_INT, source, START_TAG, MPI_COMM_WORLD);
 			fila++;
 		}
 		// printf("ROOT: todas las tareas acabadas\n");
 		for (int i=1;i<numproc; ++i){
-			MPI_Recv(&datos[0][0], pixelXmax*2, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
-			memcpy(&matriz[pixelY][0], &datos[0][0], pixelXmax*sizeof(int));
-			memcpy(&matriz2[pixelY][0], &datos[1][0], pixelXmax*sizeof(int));
-			// printf("ROOT: recibida la fila %d del proceso %d\n", filas[source], source);
+			MPI_Recv(&datos[0], 2*pixelXmax, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+			pixelY = status.MPI_TAG;
+			memcpy(&matriz[pixelY][0], &datos[0], pixelXmax*sizeof(int));
+			memcpy(&matriz2[pixelY][0], &datos[pixelXmax], pixelXmax*sizeof(int));
 		}
 
 		for (int i=1;i<numproc; ++i){
 			MPI_Send(&fila, 1, MPI_INT, i, STOP_TAG, MPI_COMM_WORLD);
 		}
-		min_max_img = buscarMinMax(matriz2,pixelYmax,pixelXmax);
-		for (i=0;i<pixelYmax;i++) {
-			for (j=0;j<pixelXmax;j++) {
-				matriz2[i][j] = matriz2[i][j] - min_max_img.min;
-				matriz2[i][j] = matriz2[i][j] * (255.0/(min_max_img.max-min_max_img.min));
+
+		// for (int y=0;y<pixelYmax;y++){
+		// 	printf("%2d: ", y);
+		// 	for (int x=0;x<pixelXmax;x++){
+		// 		printf("%6d ", matriz2[y][x]);
+		// 	}
+		// 	printf("\n");
+		// }
+		min_max_img = buscarMin_Max(matriz2,pixelYmax,pixelXmax);
+		for (int i=0;i<pixelYmax;i++) {
+			for (int j=0;j<pixelXmax;j++) {
+				matriz2[i][j] = matriz2[i][j] - min_max_img.Min;
+				matriz2[i][j] = matriz2[i][j] * (255.0/(min_max_img.Max-min_max_img.Min));
 			}
 		}
-		min_max_img = buscarMinMax(matriz2,pixelYmax,pixelXmax);
+		min_max_img = buscarMin_Max(matriz2,pixelYmax,pixelXmax);
 
 		for (pixelY=0;pixelY<pixelYmax;pixelY++) {
 			for(pixelX=0;pixelX<pixelXmax;pixelX++){
@@ -214,20 +233,32 @@ int main(int argc, char** argv){
 					bn = MaxValorTonos - SumaExponencial * 255; 
 					bn2 = (Iter +1 - (int)(log(log(sqrt(Zx2+Zy2)) / log(2)) / log(2)))*255;
 				}
-				datos[0][pixelX] = bn;
-				datos[1][pixelX] = bn2;
+				datos[pixelX] = bn;
+				datos[pixelXmax+pixelX] = bn2;
 			}
+			// printf("fila %d\n", pixelY);
+			// for (int x=0;x<pixelXmax;x++){
+			// 	printf("%6d ", datos[1][x]);
+			// }
+			// printf("\n");
+			// printf("fila %d\n", pixelY);
+			// for (int i=0;i<pixelXmax;i++){
+			// 	printf("%6d ", datos[1][i]);
+			// }
+			// printf("\n");
 			// enviar resultado al padre
 			// printf("PROCESO %d: enviando los resultados al root\n", myrank);
-			MPI_Send(&datos[0][0], pixelXmax*2, MPI_INT, 0, pixelY, MPI_COMM_WORLD);
+			MPI_Bsend(&datos[0], 2*pixelXmax, MPI_INT, 0, pixelY, MPI_COMM_WORLD);
 		}
 	}
-
+	MPI_Buffer_detach(buffer, &sizeBuffer);
 	if(myrank == 0){
 		destruirMatriz(matriz, pixelYmax);
 		destruirMatriz(matriz2, pixelYmax);
 	}
-	destruirMatriz(datos, 2);
+	// destruirMatriz(datos, 2);
+	free(datos);
+	free(buffer);
 	MPI_Finalize();
 }
 
@@ -257,62 +288,54 @@ void destruirMatriz(int** matriz, int filas){
 	free(matriz);
 }
 
-#include <sys/time.h>
-#include <sys/types.h>
-#include <sys/times.h>
-#include <unistd.h>
+Min_Max buscarMin_Max(int** array, int fil, int col){
+	Min_Max  min_max;
+	int index,fila,columna,fila_next,columna_next;
+	int n = fil*col; 
+	if ( n%2 != 0 ){
 
-static int nclock;
-double ctimer(void)
-{
-   struct timeval tp;
-   struct timezone tzp;
-   double diff;
-   nclock=sysconf(_SC_CLK_TCK);
-   gettimeofday(&tp, &tzp);
-   diff=(double)tp.tv_sec+(double)tp.tv_usec/1.0e6;
-   return diff;
-}
+		min_max.Min = array[0][0];
+		min_max.Max = array[0][0];
 
-MinMax buscarMinMax(int** array, int f, int c){
-	MinMax minmax;
-	int index, fila, columna, fila_next, columna_next;
-	int n = f*c;
-	if (n%2 != 0){
-		minmax.min = array[0][0];
-		minmax.max = array[0][0];
 		index = 1;
-	} else {
-		if (array[0][0] < array[0][1]){
-			minmax.min = array[0][0];
-			minmax.max = array[0][1];
-		} else{
-			minmax.min = array[0][1];
-			minmax.max = array[0][0];
+	}
+	else{
+		if ( array[0][0] < array[0][1] ){
+			min_max.Min = array[0][0];
+			min_max.Max = array[0][1];
+		}
+		else {
+			min_max.Min = array[0][1];
+			min_max.Max = array[0][0];
 		}
 		index = 2;
 	}
 
-	int big, small;
-	for (int i = index; i<n-1; i=i+2){
-		fila = i/c;
-		columna = i %c;
+	int big, small,i;
+	for ( i = index; i < n-1; i = i+2 ){
+		fila = i / col;
+		columna = i % col;  
 		fila_next = fila;
-		columna_next = columna+1;
-		if (columna_next == c){
-			fila_next = fila+1;
+		columna_next = columna + 1;
+		if (columna_next == col) {
+			fila_next = fila +1;
 			columna_next = 0;
 		}
-		if (array[fila][columna] < array[fila_next][columna_next]){
+		if ( array[fila][columna] < array[fila_next][columna_next] ){
 			small = array[fila][columna];
 			big = array[fila_next][columna_next];
-		} else {
+		}
+		else{
 			small = array[fila_next][columna_next];
 			big = array[fila][columna];
 		}
-		if (minmax.min > small) minmax.min = small;
-		if (minmax.max < big) minmax.max = big;
+		if ( min_max.Min > small ){
+			min_max.Min = small;
+		}
+		if ( min_max.Max < big ){ 
+			min_max.Max = big;
+		}
 	}
-	printf("Minimo = %f, Maximo = %f\n", minmax.min, minmax.max);
-	return minmax;
+	printf("Minimo = %f, Maximo = %f\n", min_max.Min, min_max.Max);
+	return min_max;
 }
