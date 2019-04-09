@@ -20,4 +20,4 @@ run_remote:
 	$(RUN) $(MFILE) $(PARAMS) $(OBJ) $(ARGS)
 
 clean: 
-	rm $(OBJ) 
+	rm $(OBJ) *.pgm
