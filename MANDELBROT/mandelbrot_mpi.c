@@ -130,17 +130,17 @@ int main(int argc, char** argv){
 	MPI_Bcast(&pixelYmax, 1, MPI_INT, 0, MPI_COMM_WORLD);
 	MPI_Bcast(&IterMax, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
-	MPI_Pack_size(pixelXmax, MPI_INT, MPI_COMM_WORLD, &sizeBuffer);
+	MPI_Pack_size(pixelXmax*2, MPI_INT, MPI_COMM_WORLD, &sizeBuffer);
 	sizeBuffer = numproc*(sizeBuffer + MPI_BSEND_OVERHEAD);
 	buffer = (int*) malloc(sizeBuffer);
 	if (buffer == NULL)
 		printf("Error al reservar la memoria del buffer\n");
+	MPI_Buffer_attach(buffer, sizeBuffer);
 
 	AnchoPixel=(RealMax-RealMin)/(pixelXmax-1); 
 	AltoPixel=(ImMax-ImMin)/(pixelYmax-1);
 
 	// matriz de datos con la que van a trabajar los hijos:
-	// int** datos = crearMatriz(2, pixelXmax);
 	int* datos = (int*) malloc(pixelXmax*2*sizeof(int));
 
 	if(myrank==0){
@@ -154,33 +154,27 @@ int main(int argc, char** argv){
 			MPI_Recv(&datos[0], 2*pixelXmax, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
 			pixelY = status.MPI_TAG;
 			int source = status.MPI_SOURCE;
+			// printf("ROOT: recibida la fila %d del proceso %d\n", pixelY, source);
 			memcpy(&matriz[pixelY][0], &datos[0], pixelXmax*sizeof(int));
 			memcpy(&matriz2[pixelY][0], &datos[pixelXmax], pixelXmax*sizeof(int));
-			// printf("ROOT: recibida la fila %d del proceso %d\n", filas[source], source);
 			
 			// printf("ROOT: enviando la fila %d al proceso %d\n", fila, source);
 			MPI_Send(&fila, 1, MPI_INT, source, START_TAG, MPI_COMM_WORLD);
 			fila++;
 		}
-		// printf("ROOT: todas las tareas acabadas\n");
+		// printf("ROOT: no quedan más filas por enviar\n");
 		for (int i=1;i<numproc; ++i){
 			MPI_Recv(&datos[0], 2*pixelXmax, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
 			pixelY = status.MPI_TAG;
+			// printf("ROOT: recibida la fila %d del proceso %d\n", pixelY, source);
 			memcpy(&matriz[pixelY][0], &datos[0], pixelXmax*sizeof(int));
 			memcpy(&matriz2[pixelY][0], &datos[pixelXmax], pixelXmax*sizeof(int));
 		}
-
+		// printf("ROOT: todas los datos recibidos\n");
 		for (int i=1;i<numproc; ++i){
 			MPI_Send(&fila, 1, MPI_INT, i, STOP_TAG, MPI_COMM_WORLD);
 		}
 
-		// for (int y=0;y<pixelYmax;y++){
-		// 	printf("%2d: ", y);
-		// 	for (int x=0;x<pixelXmax;x++){
-		// 		printf("%6d ", matriz2[y][x]);
-		// 	}
-		// 	printf("\n");
-		// }
 		min_max_img = buscarMin_Max(matriz2,pixelYmax,pixelXmax);
 		for (int i=0;i<pixelYmax;i++) {
 			for (int j=0;j<pixelXmax;j++) {
@@ -206,7 +200,7 @@ int main(int argc, char** argv){
 				MPI_Finalize();
 				return 0;
 			}
-			// printf("PROCESO %d: recibidos el número de fila\n", myrank);
+			// printf("PROCESO %d: recibido pixelY\n", myrank);
 			
 			// realizar calculos
 			Cimg = ImMin + pixelY*AltoPixel;
@@ -236,16 +230,6 @@ int main(int argc, char** argv){
 				datos[pixelX] = bn;
 				datos[pixelXmax+pixelX] = bn2;
 			}
-			// printf("fila %d\n", pixelY);
-			// for (int x=0;x<pixelXmax;x++){
-			// 	printf("%6d ", datos[1][x]);
-			// }
-			// printf("\n");
-			// printf("fila %d\n", pixelY);
-			// for (int i=0;i<pixelXmax;i++){
-			// 	printf("%6d ", datos[1][i]);
-			// }
-			// printf("\n");
 			// enviar resultado al padre
 			// printf("PROCESO %d: enviando los resultados al root\n", myrank);
 			MPI_Bsend(&datos[0], 2*pixelXmax, MPI_INT, 0, pixelY, MPI_COMM_WORLD);
