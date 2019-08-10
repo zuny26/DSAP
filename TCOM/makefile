@@ -3,7 +3,7 @@ RUN=mpirun
 FLAGS=-lm
 SOURCE=$(wildcard *.c) 
 OBJ=$(basename $(SOURCE))
-NP=4
+NP=2
 MACHINEFILE=machinefile
 PARAMS=-np $(NP)
 MFILE = -machinefile $(MACHINEFILE)
@@ -12,10 +12,10 @@ MFILE = -machinefile $(MACHINEFILE)
 $(OBJ): $(SOURCE)
 	$(CC) -o $(OBJ) $(SOURCE) $(FLAGS)
 
-run: 
+run: $(OBJ)
 	$(RUN) $(PARAMS) $(OBJ)
 
-run_remote:
+run_remote: $(OBJ)
 	$(RUN) $(MFILE) $(PARAMS) $(OBJ)
 
 clean: 
